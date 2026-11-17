@@ -1,111 +1,131 @@
 #include <iostream>
-#include <stdexcept>
-#include <string>
+#include <cstring>
+#include <chrono>
+#include <utility>
 using namespace std;
-class BankException : public exception
-{
-protected:
-    string message;
-public:
-    BankException(string msg)
-    {
-        message = msg;
-    }
-    const char* what() const noexcept override
-    {
-        return message.c_str();
-    }
-};
-class InsufficientFundsException : public BankException
-{
-public:
-    InsufficientFundsException()
-        : BankException("Error: Insufficient balance for withdrawal.")
-    {
-    }
-};
-class InvalidAmountException : public BankException
-{
-public:
-    InvalidAmountException()
-        : BankException("Error: Amount must be greater than zero.")
-    {
-    }
-};
-class BankAccount
-{
+using namespace chrono;
+class String {
 private:
-    string name;
-    double balance;
+    char* data;
+    size_t length;
 public:
-    BankAccount(string n, double b)
-    {
-        name = n;
-        balance = b;
+    static int copies,moves;
+    String(const char* str = "") {
+        if (!str) str = "";
+        length = strlen(str);
+        data = new char[length + 1];
+        strcpy(data, str);
     }
-    void deposit(double amount)
-    {
-        if (amount <= 0)
-            throw InvalidAmountException();
-        balance += amount;
+    String(const String& other) {
+        length = other.length;
+        data = new char[length + 1];
+        strcpy(data, other.data);
+        copies++;
     }
-    void withdraw(double amount)
-    {
-        if (amount <= 0)
-            throw InvalidAmountException();
-        if (amount > balance)
-            throw InsufficientFundsException();
-            balance -= amount;
+    String(String&& other) noexcept {
+        data = other.data;
+        length = other.length;
+        other.data = nullptr;
+        other.length = 0;
+        moves++;
     }
-    void display()
-    {
-        cout << "Account Holder: " << name << endl;
-        cout << "Balance: Rs. " << balance << endl;
+    void swap(String& other) noexcept {
+        std::swap(data, other.data);
+        std::swap(length, other.length);
+    }
+    String& operator=(const String& other) {
+        if (this != &other) {
+            String temp(other);
+            swap(temp);
+        }
+        return *this;
+    }
+    String& operator=(String&& other) noexcept {
+        if (this != &other) {
+            delete[] data;
+            data = other.data;
+            length = other.length;
+            other.data = nullptr;
+            other.length = 0;
+            moves++;
+        }
+        return *this;
+    }
+    String operator+(const String& other) const {
+        String result;
+        delete[] result.data;
+        result.length = length + other.length;
+        result.data = new char[result.length + 1];
+        strcpy(result.data, data ? data : "");
+        strcat(result.data, other.data ? other.data : "");
+        return result;
+    }
+    void display() const {
+        cout << (data ? data : "") << endl;
+    }
+    size_t size() const {
+        return length;
+    }
+    size_t memory() const {
+        return length + 1;
+    }
+    ~String() {
+        delete[] data;
     }
 };
-int main()
-{
-    string name;
-    double initial, dep, wd1, wd2;
-    cout << "Enter account holder name: ";
-    cin >> name;
-    cout << "Enter initial balance: ";
-    cin >> initial;
-    cout << "Enter amount to deposit: ";
-    cin >> dep;
-    cout << "Enter first amount to withdraw: ";
-    cin >> wd1;
-    cout << "Enter second amount to withdraw: ";
-    cin >> wd2;
-    BankAccount account(name, initial);
-    cout << "\nInitial Account Details:" << endl;
-    account.display();
-    try
-    {
-        cout << "\nDepositing Rs. " << dep << "..." << endl;
-        account.deposit(dep);
-        cout << "Withdrawing Rs. " << wd1 << "..." << endl;
-        account.withdraw(wd1);
-        cout << "Withdrawing Rs. " << wd2 << "..." << endl;
-        account.withdraw(wd2);
+int String::copies = 0;
+int String::moves = 0;
+template<typename T>
+String createString(T&& value) {
+    return String(forward<T>(value));
+}
+int main() {
+    const int SIZE = 50000;
+    cout << "SMART STRING MANAGEMENT SYSTEM\n";
+    cout << "--------------------------------\n";
+    String original("Advanced C++ String Optimization");
+    cout << "\n--- STRING INFORMATION ---\n";
+    cout << "Original: ";
+    original.display();
+    cout << "Length: " << original.size() << endl;
+    cout << "Memory: " << original.memory() << " bytes\n";
+    String extra(" Using Move Semantics");
+    String combined = original + extra;
+    cout << "\n--- CONCATENATION ---\n";
+    combined.display();
+    String forwarded = createString("Perfect Forwarding");
+    cout << "\n--- FORWARDING ---\n";
+    forwarded.display();
+    String::copies = 0;
+    String::moves = 0;
+    auto startCopy = steady_clock::now();
+    for (int i = 0; i < SIZE; i++) {
+        String temp(original);
     }
-    catch (const InsufficientFundsException &e)
-    {
-        cout << e.what() << endl;
+    auto endCopy = steady_clock::now();
+    auto copyTime =
+        duration_cast<microseconds>(endCopy - startCopy);
+    int copyCount = String::copies;
+    String::moves = 0;
+    String* sources = new String[SIZE];
+    for (int i = 0; i < SIZE; i++)
+        sources[i] = String("Move Optimization Example");
+    auto startMove = steady_clock::now();
+    for (int i = 0; i < SIZE; i++) {
+        String temp(move(sources[i]));
     }
-    catch (const InvalidAmountException &e)
-    {
-        cout << e.what() << endl;
-    }
-    catch (const BankException &e)
-    {
-        cout << "Bank Exception: " << e.what() << endl;
-    }
-    catch (const exception &e)
-    {
-        cout << "General Exception: " << e.what() << endl;
-    }
-    cout << "\nFinal Account Details:" << endl;
-    account.display();
+    auto endMove = steady_clock::now();
+    auto moveTime =
+        duration_cast<microseconds>(endMove - startMove);
+    int moveCount = String::moves;
+    delete[] sources;
+    cout << "\n--- PERFORMANCE REPORT ---\n";
+    cout << "Copy Operations : " << copyCount << endl;
+    cout << "Move Operations : " << moveCount << endl;
+    cout << "Copy Time : "
+         << copyTime.count() << " us\n";
+    cout << "Move Time : "
+         << moveTime.count() << " us\n";
+    cout << "\nMemory Optimization Completed!\n";
     return 0;
 }
